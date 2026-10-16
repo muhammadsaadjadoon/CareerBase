@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="420" viewBox="0 0 1440 420" role="img" aria-labelledby="title description">
+<title id="title">CareerBase — Manage Internships. Build Careers.</title>
+<desc id="description">Navy and gold CareerBase banner with People, Delivery and Growth cards.</desc>
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#101e36"/><stop offset="1" stop-color="#214a76"/></linearGradient>
+ <linearGradient id="accent"><stop stop-color="#e9c861"/><stop offset="1" stop-color="#d8ac25"/></linearGradient>
+</defs>
+<rect width="1440" height="420" rx="28" fill="url(#bg)"/>
+<circle cx="1370" cy="35" r="260" fill="#3977ee" opacity=".10"/>
+<circle cx="1320" cy="30" r="200" fill="none" stroke="#aac3ee" stroke-opacity=".10"/>
+<path d="M68 67h38" stroke="url(#accent)" stroke-width="5" stroke-linecap="round"/>
+<text x="122" y="73" fill="#e9c861" font-family="Arial,Helvetica,sans-serif" font-size="14" font-weight="700" letter-spacing="3">THE INTERNSHIP WORKSPACE</text>
+<text x="64" y="180" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="88" font-weight="700" letter-spacing="-4">CareerBase</text>
+<text x="68" y="238" fill="#f0d479" font-family="Arial,Helvetica,sans-serif" font-size="29" font-weight="500">Manage Internships. Build Careers.</text>
+<text x="68" y="295" fill="#cfdbec" font-family="Arial,Helvetica,sans-serif" font-size="20">People, programs and reviewed work in one connected workspace.</text>
+<text x="68" y="365" fill="#a7bbd5" font-family="Arial,Helvetica,sans-serif" font-size="14" letter-spacing="2">FLUTTER  /  DART  /  FIREBASE</text>
+<g font-family="Arial,Helvetica,sans-serif">
+ <rect x="956" y="83" width="408" height="76" rx="17" fill="#fff" fill-opacity=".07" stroke="#fff" stroke-opacity=".14"/>
+ <circle cx="994" cy="121" r="16" fill="#3977ee" fill-opacity=".24"/><circle cx="994" cy="118" r="5" fill="#b1ccff"/><path d="M986 131q8-11 16 0" fill="none" stroke="#b1ccff" stroke-width="2"/>
+ <text x="1028" y="116" fill="#fff" font-size="18" font-weight="700">People</text><text x="1028" y="139" fill="#bdcfe5" font-size="14">Connected accounts. Clear ownership.</text>
+ <rect x="956" y="172" width="408" height="76" rx="17" fill="#fff" fill-opacity=".07" stroke="#fff" stroke-opacity=".14"/>
+ <circle cx="994" cy="210" r="16" fill="#17a58b" fill-opacity=".24"/><path d="m986 210 5 5 11-11" fill="none" stroke="#79dfc6" stroke-width="3" stroke-linecap="round"/>
+ <text x="1028" y="205" fill="#fff" font-size="18" font-weight="700">Delivery</text><text x="1028" y="228" fill="#bdcfe5" font-size="14">Assignments, submissions and reviews.</text>
+ <rect x="956" y="261" width="408" height="76" rx="17" fill="#fff" fill-opacity=".07" stroke="#fff" stroke-opacity=".14"/>
+ <circle cx="994" cy="299" r="16" fill="#d8ac25" fill-opacity=".22"/><path d="M986 307v-7m8 7v-12m8 12v-19" fill="none" stroke="#e9c861" stroke-width="3" stroke-linecap="round"/>
+ <text x="1028" y="294" fill="#fff" font-size="18" font-weight="700">Growth</text><text x="1028" y="317" fill="#bdcfe5" font-size="14">Progress grounded in approved work.</text>
+</g>
+</svg>

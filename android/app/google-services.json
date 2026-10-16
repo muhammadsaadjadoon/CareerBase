@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "531017031047",
+    "project_id": "careerbase-16a49",
+    "storage_bucket": "careerbase-16a49.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:531017031047:android:b097ee8fb5961627ddc722",
+        "android_client_info": {
+          "package_name": "com.saadi.careerbase"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "531017031047-pedfu5db9hi982611jo0787lh4ro3gpt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEjU6LIpVwJ0pcp8w2SikxwVma3nTRMVE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "531017031047-pedfu5db9hi982611jo0787lh4ro3gpt.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

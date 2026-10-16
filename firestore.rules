@@ -1,0 +1,118 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function signed(){return request.auth != null;}
+  function verified(){return signed() && request.auth.token.email_verified == true;}
+  function self(){return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;}
+  function enabled(){return verified() && self().active == true;}
+  function admin(){return enabled() && self().role == 'admin';}
+  function internId(){return self().internId;}
+  function owns(id){return enabled() && self().role == 'intern' && internId() == id;}
+  function working(id){return owns(id) && get(/databases/$(database)/documents/interns/$(id)).data.active == true;}
+  function text(v,min,max){return v is string && v.size()>=min && v.size()<=max;}
+  function link(v){return v == '' || (text(v,8,1000) && v.matches('https://[^/@ \\n]+\\.[^/ \\n]+.*'));}
+  function validIntern(d){return d.keys().hasAll(['name','email','department','supervisor','startMs','endMs','university','skills','phone','bio','photo','active','accountUid']) && d.keys().hasOnly(['name','email','department','supervisor','startMs','endMs','university','skills','phone','bio','photo','active','accountUid','programId','enrollmentStatus']) && (!d.keys().hasAny(['programId']) || text(d.programId,0,128)) && (!d.keys().hasAny(['enrollmentStatus']) || d.enrollmentStatus in ['Pending','Active','Archived']) && text(d.name,2,120) && text(d.email,3,254) && text(d.department,2,80) && text(d.supervisor,2,80) && d.startMs is int && d.endMs is int && d.startMs>0 && d.endMs>=d.startMs && text(d.university,0,120) && text(d.skills,0,1000) && text(d.phone,0,30) && text(d.bio,0,1000) && text(d.photo,0,140000) && d.active is bool && text(d.accountUid,0,128);}
+  match /users/{uid}{
+   allow get: if signed() && request.auth.uid==uid;
+   allow list: if admin();
+   allow create: if verified() && request.auth.uid==uid && request.resource.data.keys().hasAll(['role','internId','active']) && request.resource.data.keys().hasOnly(['role','internId','active']) && request.resource.data.role=='intern' && request.resource.data.active==true && (
+    (request.resource.data.internId==uid && getAfter(/databases/$(database)/documents/interns/$(uid)).data.accountUid==uid && getAfter(/databases/$(database)/documents/interns/$(uid)).data.active==false && getAfter(/databases/$(database)/documents/interns/$(uid)).data.enrollmentStatus=='Pending')
+    || (request.resource.data.internId == get(/databases/$(database)/documents/invitations/$(request.auth.token.email)).data.internId && getAfter(/databases/$(database)/documents/interns/$(request.resource.data.internId)).data.accountUid==uid)
+   );
+   // Administrator identities and account suspension are console controlled.
+   allow update,delete: if false;
+  }
+  match /invitations/{email}{
+   allow get: if signed() && (email==request.auth.token.email || admin());
+   allow list: if admin();
+   allow create: if admin() && request.resource.data.keys().hasOnly(['internId']) && text(request.resource.data.internId,1,128) && getAfter(/databases/$(database)/documents/interns/$(request.resource.data.internId)).data.email==email;
+   allow update,delete: if false;
+  }
+  match /interns/{id}{
+   allow get: if (verified() && resource.data.email==request.auth.token.email) || admin() || owns(id);
+   allow list: if admin();
+   allow create: if validIntern(request.resource.data) && (
+    (admin() && request.resource.data.accountUid=='' && getAfter(/databases/$(database)/documents/invitations/$(request.resource.data.email)).data.internId==id)
+    || (verified() && id==request.auth.uid && request.resource.data.email==request.auth.token.email && request.resource.data.accountUid==request.auth.uid && request.resource.data.active==false && !exists(/databases/$(database)/documents/invitations/$(request.auth.token.email)) && request.resource.data.enrollmentStatus=='Pending' && request.resource.data.programId=='' && request.resource.data.department=='Unassigned' && request.resource.data.supervisor=='Unassigned' && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.role=='intern' && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.internId==id)
+   );
+   allow update: if validIntern(request.resource.data) && (
+    (admin() && request.resource.data.email==resource.data.email && request.resource.data.accountUid==resource.data.accountUid)
+    || (working(id) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','university','skills','phone','bio','photo']))
+    || (verified() && resource.data.active==true && resource.data.email==request.auth.token.email && resource.data.accountUid=='' && request.resource.data.accountUid==request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['accountUid']) && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.internId==id)
+   );
+   allow delete: if false;
+  }
+  function validTask(d){return d.keys().hasAll(['internId','title','description','priority','dueMs','reference','createdBy','status','attempt','latestId','feedback','score','archived','createdAt','updatedAt']) && d.keys().hasOnly(['internId','title','description','priority','dueMs','reference','createdBy','status','attempt','latestId','feedback','score','archived','createdAt','updatedAt']) && text(d.internId,1,128) && text(d.title,3,120) && text(d.description,10,5000) && d.priority in ['Low','Normal','High'] && d.dueMs is int && d.dueMs>0 && link(d.reference) && text(d.createdBy,1,128) && d.status in ['Assigned','In Progress','Submitted','Revision Required','Resubmitted','Approved'] && d.attempt is int && d.attempt>=0 && d.attempt<=1000 && text(d.latestId,0,128) && text(d.feedback,0,1500) && (d.score==null || (d.score is int && d.score>=0 && d.score<=100)) && (d.status!='Approved' || (d.score is int && d.feedback.size()>=3)) && (d.status!='Revision Required' || d.feedback.size()>=3) && d.archived is bool && d.createdAt is timestamp && d.updatedAt is timestamp;}
+  function reviewed(status){return status in ['Submitted','Resubmitted'];}
+  match /tasks/{id}{
+   allow read: if admin() || owns(resource.data.internId);
+   allow create: if admin() && validTask(request.resource.data) && request.resource.data.createdBy==request.auth.uid && request.resource.data.createdAt==request.time && request.resource.data.updatedAt==request.time && request.resource.data.status=='Assigned' && request.resource.data.attempt==0 && request.resource.data.latestId=='' && request.resource.data.feedback=='' && request.resource.data.score==null && request.resource.data.archived==false && get(/databases/$(database)/documents/interns/$(request.resource.data.internId)).data.active==true;
+   allow update: if validTask(request.resource.data) && request.resource.data.internId==resource.data.internId && request.resource.data.createdBy==resource.data.createdBy && request.resource.data.createdAt==resource.data.createdAt && request.resource.data.updatedAt==request.time && (
+    (admin() && (
+      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['archived','updatedAt'])
+      || (!resource.data.archived && resource.data.status in ['Assigned','In Progress','Revision Required'] && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','priority','dueMs','reference','updatedAt']) && request.resource.data.dueMs>request.time.toMillis())
+      || (!resource.data.archived && reviewed(resource.data.status) && request.resource.data.status in ['Approved','Revision Required'] && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','feedback','score','updatedAt']) && request.resource.data.feedback.size()>=3 && getAfter(/databases/$(database)/documents/submissions/$(resource.data.latestId)).data.review==request.resource.data.status && getAfter(/databases/$(database)/documents/submissions/$(resource.data.latestId)).data.feedback==request.resource.data.feedback && getAfter(/databases/$(database)/documents/submissions/$(resource.data.latestId)).data.score==request.resource.data.score)
+    ))
+    || (working(resource.data.internId) && !resource.data.archived && (
+      (resource.data.status=='Assigned' && request.resource.data.status=='In Progress' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt']))
+      || (resource.data.status in ['Assigned','In Progress','Revision Required'] && request.resource.data.status==(resource.data.status=='Revision Required'?'Resubmitted':'Submitted') && request.resource.data.attempt==resource.data.attempt+1 && request.resource.data.latestId!=resource.data.latestId && request.resource.data.feedback=='' && request.resource.data.score==null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','attempt','latestId','feedback','score','updatedAt']) && getAfter(/databases/$(database)/documents/submissions/$(request.resource.data.latestId)).data.taskId==id && getAfter(/databases/$(database)/documents/submissions/$(request.resource.data.latestId)).data.attempt==request.resource.data.attempt)
+    ))
+   );
+   allow delete: if false;
+  }
+  function validSubmission(d){return d.keys().hasAll(['taskId','internId','attempt','workUrl','demoUrl','notes','feedback','score','review','submittedAt']) && d.keys().hasOnly(['taskId','internId','attempt','workUrl','demoUrl','notes','feedback','score','review','submittedAt','reviewedAt']) && text(d.taskId,1,128) && text(d.internId,1,128) && d.attempt is int && d.attempt>0 && d.attempt<=1000 && d.workUrl!='' && link(d.workUrl) && link(d.demoUrl) && text(d.notes,10,3000) && text(d.feedback,0,1500) && d.review in ['Pending','Approved','Revision Required'] && (d.score==null || (d.score is int && d.score>=0 && d.score<=100)) && d.submittedAt is timestamp;}
+  match /submissions/{id}{
+   allow read: if admin() || owns(resource.data.internId);
+   allow create: if working(request.resource.data.internId) && validSubmission(request.resource.data) && !request.resource.data.keys().hasAny(['reviewedAt']) && request.resource.data.submittedAt==request.time && request.resource.data.review=='Pending' && request.resource.data.feedback=='' && request.resource.data.score==null && get(/databases/$(database)/documents/tasks/$(request.resource.data.taskId)).data.internId==internId() && !get(/databases/$(database)/documents/tasks/$(request.resource.data.taskId)).data.archived && get(/databases/$(database)/documents/tasks/$(request.resource.data.taskId)).data.status in ['Assigned','In Progress','Revision Required'] && getAfter(/databases/$(database)/documents/tasks/$(request.resource.data.taskId)).data.latestId==id && getAfter(/databases/$(database)/documents/tasks/$(request.resource.data.taskId)).data.attempt==request.resource.data.attempt && reviewed(getAfter(/databases/$(database)/documents/tasks/$(request.resource.data.taskId)).data.status);
+   allow update: if admin() && validSubmission(request.resource.data) && resource.data.review=='Pending' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['review','feedback','score','reviewedAt']) && request.resource.data.review in ['Approved','Revision Required'] && request.resource.data.feedback.size()>=3 && request.resource.data.reviewedAt==request.time && getAfter(/databases/$(database)/documents/tasks/$(resource.data.taskId)).data.latestId==id && getAfter(/databases/$(database)/documents/tasks/$(resource.data.taskId)).data.status==request.resource.data.review && getAfter(/databases/$(database)/documents/tasks/$(resource.data.taskId)).data.feedback==request.resource.data.feedback && getAfter(/databases/$(database)/documents/tasks/$(resource.data.taskId)).data.score==request.resource.data.score;
+   allow delete: if false;
+  }
+  match /settings/{id}{
+   allow get: if enabled() && (id=='workspace' || admin());
+   allow list: if admin();
+   allow create,update: if admin() && id=='workspace' && request.resource.data.keys().hasAll(['name','description']) && request.resource.data.keys().hasOnly(['name','description']) && text(request.resource.data.name,2,80) && text(request.resource.data.description,0,300);
+   allow delete: if false;
+  }
+  match /programs/{id}{
+   allow read: if enabled();
+   allow create,update: if admin() && request.resource.data.keys().hasAll(['name','department','supervisor','capacity','startMs','endMs','active']) && request.resource.data.keys().hasOnly(['name','department','supervisor','capacity','startMs','endMs','active','createdAt','role','description','mode','location','supervisorContact']) && (!request.resource.data.keys().hasAny(['role']) || text(request.resource.data.role,0,120)) && (!request.resource.data.keys().hasAny(['description']) || text(request.resource.data.description,0,3000)) && (!request.resource.data.keys().hasAny(['mode']) || request.resource.data.mode in ['Remote','On-site','Hybrid']) && (!request.resource.data.keys().hasAny(['location']) || text(request.resource.data.location,0,120)) && (!request.resource.data.keys().hasAny(['supervisorContact']) || text(request.resource.data.supervisorContact,0,120)) && text(request.resource.data.name,3,100) && text(request.resource.data.department,2,80) && text(request.resource.data.supervisor,2,80) && request.resource.data.capacity is int && request.resource.data.capacity>=1 && request.resource.data.capacity<=10000 && request.resource.data.startMs is int && request.resource.data.endMs is int && request.resource.data.startMs>0 && request.resource.data.endMs>=request.resource.data.startMs && request.resource.data.active is bool;
+   allow delete: if false;
+  }
+  match /announcements/{id}{
+   allow read: if enabled() && (admin() || resource.data.active==true);
+   allow create,update: if admin() && request.resource.data.keys().hasAll(['title','body','active','createdAt']) && request.resource.data.keys().hasOnly(['title','body','active','createdAt']) && text(request.resource.data.title,3,120) && text(request.resource.data.body,5,3000) && request.resource.data.active is bool && request.resource.data.createdAt is timestamp;
+   allow delete: if false;
+  }
+  function businessDay(){let t=request.time+duration.value(5,'h');return string(t.year())+'-'+(t.month()<10?'0':'')+string(t.month())+'-'+(t.day()<10?'0':'')+string(t.day());}
+  match /attendance/{id}{
+   allow read: if admin() || owns(resource.data.internId);
+   allow create: if request.resource.data.keys().hasAll(['internId','day','checkedInAt','checkedOutAt']) && request.resource.data.keys().hasOnly(['internId','day','checkedInAt','checkedOutAt']) && working(request.resource.data.internId) && text(request.resource.data.day,10,10) && request.resource.data.day==businessDay() && id==request.resource.data.internId+'_'+request.resource.data.day && request.resource.data.checkedInAt==request.time && request.resource.data.checkedOutAt==null;
+   allow update: if working(resource.data.internId) && resource.data.checkedOutAt==null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkedOutAt']) && request.resource.data.checkedOutAt==request.time;
+   allow delete: if false;
+  }
+  function validLeave(d){return d.keys().hasAll(['internId','fromMs','toMs','reason','status','feedback','createdAt']) && d.keys().hasOnly(['internId','fromMs','toMs','reason','status','feedback','createdAt']) && text(d.internId,1,128) && d.fromMs is int && d.toMs is int && d.fromMs>0 && d.toMs>=d.fromMs && d.toMs-d.fromMs<=7776000000 && text(d.reason,10,1500) && d.status in ['Pending','Approved','Rejected'] && text(d.feedback,0,1500) && d.createdAt is timestamp;}
+  match /leaves/{id}{
+   allow read: if admin() || owns(resource.data.internId);
+   allow create: if working(request.resource.data.internId) && validLeave(request.resource.data) && request.resource.data.status=='Pending' && request.resource.data.feedback=='' && request.resource.data.createdAt==request.time;
+   allow update: if admin() && validLeave(request.resource.data) && resource.data.status=='Pending' && request.resource.data.status in ['Approved','Rejected'] && request.resource.data.feedback.size()>=3 && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','feedback']);
+   allow delete: if false;
+  }
+  match /stipends/{id}{
+   allow read: if admin() || owns(resource.data.internId);
+   allow create,update: if admin() && request.resource.data.keys().hasAll(['internId','amountMinor','currency','period','reference','status','createdAt']) && request.resource.data.keys().hasOnly(['internId','amountMinor','currency','period','reference','status','createdAt']) && exists(/databases/$(database)/documents/interns/$(request.resource.data.internId)) && request.resource.data.amountMinor is int && request.resource.data.amountMinor>=1 && request.resource.data.amountMinor<=1000000000 && request.resource.data.currency in ['PKR','USD','GBP','EUR'] && text(request.resource.data.period,1,120) && text(request.resource.data.reference,0,120) && request.resource.data.status in ['Pending','Paid'] && request.resource.data.createdAt is timestamp;
+   allow delete: if false;
+  }
+
+  function validApplication(d){return d.keys().hasAll(['internId','programId','motivation','status','feedback','createdAt']) && d.keys().hasOnly(['internId','programId','motivation','status','feedback','createdAt','reviewedAt']) && text(d.internId,1,128) && text(d.programId,1,128) && text(d.motivation,10,1500) && d.status in ['Pending','Accepted','Rejected'] && text(d.feedback,0,1500) && d.createdAt is timestamp;}
+  match /applications/{id}{
+   allow read: if admin() || owns(resource.data.internId);
+   allow create: if owns(request.resource.data.internId) && validApplication(request.resource.data) && id==request.resource.data.internId+'_'+request.resource.data.programId && request.resource.data.status=='Pending' && request.resource.data.feedback=='' && request.resource.data.createdAt==request.time && !request.resource.data.keys().hasAny(['reviewedAt']) && get(/databases/$(database)/documents/programs/$(request.resource.data.programId)).data.active==true && (!get(/databases/$(database)/documents/interns/$(request.resource.data.internId)).data.keys().hasAny(['programId']) || get(/databases/$(database)/documents/interns/$(request.resource.data.internId)).data.programId=='');
+   allow update: if admin() && validApplication(request.resource.data) && resource.data.status=='Pending' && request.resource.data.status in ['Accepted','Rejected'] && request.resource.data.feedback.size()>=3 && request.resource.data.reviewedAt==request.time && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','feedback','reviewedAt']) && (
+    request.resource.data.status=='Rejected'
+    || (get(/databases/$(database)/documents/programs/$(resource.data.programId)).data.active==true && getAfter(/databases/$(database)/documents/interns/$(resource.data.internId)).data.active==true && getAfter(/databases/$(database)/documents/interns/$(resource.data.internId)).data.enrollmentStatus=='Active' && getAfter(/databases/$(database)/documents/interns/$(resource.data.internId)).data.programId==resource.data.programId && (!get(/databases/$(database)/documents/interns/$(resource.data.internId)).data.keys().hasAny(['programId']) || get(/databases/$(database)/documents/interns/$(resource.data.internId)).data.programId==''))
+   );
+   allow delete: if false;
+  }
+
+ }
+}

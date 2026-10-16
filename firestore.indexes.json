@@ -1,0 +1,1 @@
+{"indexes":[],"fieldOverrides":[{"collectionGroup":"interns","fieldPath":"photo","indexes":[]},{"collectionGroup":"tasks","fieldPath":"description","indexes":[]},{"collectionGroup":"submissions","fieldPath":"notes","indexes":[]}]}
